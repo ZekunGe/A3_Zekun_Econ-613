@@ -349,11 +349,18 @@ coefficeint_E5_means
 # X_E5_meansshare_of_white_1       -1.687822e+02 2.985714e+02  -0.56529915 5.718802e-01
 
 # A First-Difference Estimator
-X_E5_firstdiff = as.matrix(E5_firstdiff[,c(6:7,9:11,12:36,38:99)])
+X_E5_firstdiff = as.matrix(E5_firstdiff[,c(6:7,9:11,12:21,38:47)])
 Y_E5_firstdiff = as.matrix(E5_firstdiff[,4])
 model_E5_firstdiff = lm(Y_E5_firstdiff ~ 0 + X_E5_firstdiff)
 coefficient_E5_firstdiff = summary(model_E5_firstdiff)$coefficient
-beta_E5_firstdiff = solve(t(X_E5_firstdiff) %*% X_E5_firstdiff) %*% t(X_E5_firstdiff) %*% Y_E5_firstdiff
+coefficient_E5_firstdiff
+
+#                                       Estimate    Std. Error     t value      Pr(>|t|)
+# X_E5_firstdifftotal_crime_district -2.587856e-02 1.577121e-04 -164.0873627  0.000000e+00
+# X_E5_firstdiffmedian_income         4.109763e-04 1.035946e-05   39.6715967  0.000000e+00
+# X_E5_firstdiffshare_of_black        1.656223e+02 3.951592e-01  419.1281293  0.000000e+00
+# X_E5_firstdiffshare_of_hispanic     1.810360e+02 4.826598e-01  375.0798315  0.000000e+00
+# X_E5_firstdiffshare_of_white        2.102690e+02 1.035240e+00  203.1113374  0.000000e+00
 
 
 ### GMM Estimation
