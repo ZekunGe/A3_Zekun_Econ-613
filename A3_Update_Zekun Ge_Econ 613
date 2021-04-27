@@ -1,0 +1,371 @@
+getwd()
+setwd(dir = "C:/Users/zg66/Desktop/Econ 613 Paper")
+
+# install.packages("bayesm")
+# install.packages("fastDummies")
+# install.packages("gmm")
+# install.packages("tidyverse")
+library(bayesm)
+library(dplyr)
+library(fastDummies)
+library(gmm)
+library(tidyr)
+
+#// Exercise Two
+# Import the relevant data
+Officers<-read.csv("file:///C:/Users/zg66/Desktop/Econ 613 Paper/officers.csv")
+Crime<-read.csv("file:///C:/Users/zg66/Desktop/Econ 613 Paper/crime_long.csv")
+Population<-read.csv("file:///C:/Users/zg66/Desktop/Econ 613 Paper/population.csv")
+
+library(tidyverse)
+library(ggplot2)
+library(lattice)
+
+# Total Crime Per Month
+Total_Crime_Per_Month = Crime %>% group_by(crime_month) %>%
+  summarise(
+    Total_Crime_Per_Month=sum(crimes)
+  )
+
+# Plot the time series of crime
+month = as.Date(Total_Crime_Per_Month %>% pull(crime_month))
+Crime_month = Total_Crime_Per_Month %>% pull(Total_Crime_Per_Month)
+# Plotting the time series of crime
+plot(month,Crime_month,col=1,type="l",xaxt='n',main='Total Crimes Per Month',
+     xlab='All months',ylab='Total crime',lwd=1)
+axis.Date(1,at=seq(min(month),max(month),by='48 mon'),format='%Y-%m')
+
+# Merging two data sets
+Renamed_population = rename(Population,crime_month = month)
+Crime$ID = paste0(Crime$crime_month,Crime$district)
+Crime_Pick = Crime %>%
+  group_by(ID,crime_type) %>%
+  summarise(
+    Total_Crime = sum(crimes),.groups="drop"
+  )
+Crime$ID_Pick = paste0(Crime$ID,Crime$crime_type)
+Crime_Pick$ID_Pick = paste0(Crime_Pick$ID,Crime_Pick$crime_type)
+# Merge
+Crime_Pick$ID = NULL
+Crime_Pick$crime_type = NULL
+Crime = merge(Crime,Crime_Pick,by="ID_Pick")
+
+Crime_Pick = NULL
+Crime = Crime[!duplicated(Crime[,c("ID_Pick")]),]
+Crime$ID_Pick = NULL
+Crime$crimes = NULL
+
+Population$ID = paste0(Population$month, Population$district)
+Crime_Merged = Crime
+Crime_Merged$crime_month = NULL
+Crime_Merged$district = NULL
+# Raw Independent Dataset
+Raw_Independent_Dataset = merge(Population,Crime_Merged,by="ID")
+
+# Construct a new panel data which includes new variables
+Independent_Dataset = Raw_Independent_Dataset
+
+Independent_Dataset_NewVariables = Independent_Dataset %>%
+  group_by(ID) %>%
+  summarise(
+    Total_Crime_Per_Resident = sum(Total_Crime)/tot_pop,
+    Violent_Crime_Per_Resident = sum(Total_Crime[crime_type=="violent"])/tot_pop,
+    Property_Crime_Per_Resident = sum(Total_Crime[crime_type=="property"])/tot_pop,
+    Black_Share = tot_black/tot_pop,
+    White_Share = tot_white/tot_pop,
+    Hispanic_Share = tot_hisp/tot_pop,
+    .groups="drop"
+  )
+
+Independent_Dataset = merge(Independent_Dataset,Independent_Dataset_NewVariables,by="ID")
+
+Independent_Dataset = Independent_Dataset[,c(1:4,9,12:17)]
+Independent_Dataset = Independent_Dataset[!duplicated(Independent_Dataset[,c("ID")]),]
+
+Independent_Dataset$ID = NULL
+Independent_Dataset[,c(5:10)] = round(Independent_Dataset[,c(5:10)],digits=4)
+Independent_Dataset_Final = Independent_Dataset[order(Independent_Dataset$month,Independent_Dataset$district),]
+head(Independent_Dataset,20)
+
+Renamed_Officers = rename(Officers,district = unit)
+Renamed_Officers$ID = paste0(Renamed_Officers$month, Renamed_Officers$district)
+Independent_Dataset_Final$ID = paste0(Independent_Dataset_Final$month, Independent_Dataset_Final$district)
+# Merge
+Raw_Regession_Data = merge(Independent_Dataset_Final, Renamed_Officers,by="ID")
+Raw_Regession_Data$ID = NULL
+Raw_Regession_Data = rename(Raw_Regession_Data,month = month.x)
+Raw_Regession_Data = rename(Raw_Regession_Data,district = district.x)
+Regession_Dataset = Raw_Regession_Data[order(Raw_Regession_Data$month,Raw_Regession_Data$district),]
+Regession_Dataset$month.y = NULL
+Regession_Dataset$district.y = NULL
+
+Renamed_Crime = rename(Crime,month = crime_month)
+Renamed_Crime$ID = paste0(Renamed_Crime$month, Renamed_Crime$district)
+Regession_Dataset$ID = paste0(Regession_Dataset$month, Regession_Dataset$district)
+
+Final_Dataset = merge(Regession_Dataset, Renamed_Crime,by="ID")
+Final_Dataset$district.y = NULL
+Final_Dataset$month.y = NULL
+Final_Dataset$ID = NULL
+Final_Dataset = rename(Final_Dataset,district = district.x)
+Final_Dataset = rename(Final_Dataset,month = month.x)
+Regession_Dataset$ID = NULL
+
+
+#========================================
+# Another way to achieve The whole Exercise 2 as a double check
+Officers2<-read.csv("file:///C:/Users/zg66/Desktop/Econ 613 Paper/officers.csv")
+Crime2<-read.csv("file:///C:/Users/zg66/Desktop/Econ 613 Paper/crime_long.csv")
+Population2<-read.csv("file:///C:/Users/zg66/Desktop/Econ 613 Paper/population.csv")
+
+# The value of Crime Per Month
+Crime_Per_Month = Crime2 %>%
+  group_by(crime_month) %>%
+  summarise(
+    Crime_Per_Month = sum(crimes)
+  )
+Month = as.Date(Crime_Per_Month %>% pull(crime_month))
+crime_per_month = Crime_Per_Month %>% pull(Crime_Per_Month)
+# Plotting the time series of crime
+plot(Month,crime_per_month,col=1,type="l",xaxt='n',main='Crime Per Month',
+     xlab='month',ylab='Total crime',lwd=1)
+axis.Date(1,at=seq(min(Month),max(Month),by='48 mon'),format='%Y-%m')
+
+# Merge two datasets
+E2_Q2 = full_join(Crime2,Population2,
+                by=c('crime_month'='month','district'='district'))
+
+# Exercise 2_Question 3
+Baseline <- E2_Q2  
+Extended_Baseline = Baseline %>% group_by(crime_month,district) %>%
+  summarise(crime_district = sum(crimes),population_district = sum(tot_pop), Total_white = sum(tot_white),
+            Total_black = sum(tot_black),Total_hispanic = sum(tot_hisp),
+            median_income = quantile(p50_inc,1/2,na.rm = TRUE))
+
+Re_Extended_Baseline = Baseline %>% group_by(crime_month,district,crime_type) %>%
+  summarise(crime_Per_type = sum(crimes))
+
+population_district = Extended_Baseline %>% pull(population_district)
+Missing_Variable = which(is.na(population_district) == FALSE)
+population_district = population_district[!is.na(population_district)]
+Crime2_TRUE = data.frame(matrix(ncol = 0,nrow = length(population_district)))
+
+crime_month = Extended_Baseline %>% pull(crime_month)
+Crime2_TRUE$crime_month = crime_month[c(Missing_Variable)]
+
+district = Extended_Baseline %>% pull(district)
+Crime2_TRUE$district = district[c(Missing_Variable)]
+
+crime_district = Extended_Baseline %>% pull(crime_district)
+Crime2_TRUE$crime_district = crime_district[c(Missing_Variable)]
+
+Crime2_TRUE$population_district = population_district
+
+Total_white = Extended_Baseline %>% pull(Total_white)
+Crime2_TRUE$Total_white = Total_white[c(Missing_Variable)]
+
+Total_black = Extended_Baseline %>% pull(Total_black)
+Crime2_TRUE$Total_black = Total_black[c(Missing_Variable)]
+
+Total_hispanic = Extended_Baseline %>% pull(Total_hispanic)
+Crime2_TRUE$Total_hispanic = Total_hispanic[c(Missing_Variable)]
+
+median_income = Extended_Baseline %>% pull(median_income)
+Crime2_TRUE$median_income = median_income[c(Missing_Variable)]
+
+crime_month = Re_Extended_Baseline %>% pull(crime_month)
+Crime2_Revisited_TRUE = data.frame(matrix(ncol = 0,nrow = length(crime_month)))
+Crime2_Revisited_TRUE$crime_month = crime_month
+Crime2_Revisited_TRUE$district = Re_Extended_Baseline %>% pull(district)
+Crime2_Revisited_TRUE$crime_type = Re_Extended_Baseline %>% pull(crime_type)
+Crime2_Revisited_TRUE$crime_Per_type = Re_Extended_Baseline %>% pull(crime_Per_type)
+
+Preliminary_Merge = full_join(Crime2_TRUE, Crime2_Revisited_TRUE,
+                by = c("crime_month","district"))
+Missing_Variable_Merge = which(is.na(Preliminary_Merge$crime_district) == FALSE)
+Updated_Merge = Preliminary_Merge[c(Missing_Variable_Merge),]
+
+Updated_Merge$crime_Per_resident = Updated_Merge$crime_district/Updated_Merge$population_district
+Updated_Merge$type_Per_resident = Updated_Merge$crime_Per_type/Updated_Merge$population_district
+Updated_Merge$black_share = Updated_Merge$Total_black/Updated_Merge$population_district
+Updated_Merge$hispanic_share = Updated_Merge$Total_hispanic/Updated_Merge$population_district
+Updated_Merge$white_share = Updated_Merge$Total_white/Updated_Merge$population_district
+Updated_Merge$property_Per_resident = NULL
+
+Final_Merge = Updated_Merge[,c(1:3,8:15)]
+Final_Merge = subset(Final_Merge, Final_Merge$crime_type == 'violent' | Final_Merge$crime_type == 'property')
+Finished_Merge = spread(Final_Merge, crime_type, type_Per_resident)
+colnames(Finished_Merge) = c('month','district','total_crime_district','median_income','total_crime_Per_type', 'crime_per_resident','share_of_black','share_of_hispanic','share_of_white',
+                  'property crime_per_resident','violent crime_per_resident')
+
+
+#// Exercise Three
+# install.packages("plm")
+library(plm)
+# pooling regression without any restraints
+Pure_Pooling_TotalCrime <- plm(tenure ~ Total_Crime + p50_inc + Black_Share + White_Share + Hispanic_Share, data = Final_Dataset, model = "pooling")
+Pure_Pooling_TotalCrime
+# Coefficients:
+#  (Intercept)    Total_Crime       p50_inc     Black_Share    White_Share 
+#  1.7921e+02     -1.5059e-02     6.1594e-04    -5.2260e+01    -3.3424e+01 
+# Hispanic_Share 
+#  -4.6262e+01 
+Pure_Pooling_Total_Crime_Per_Resident <- plm(tenure ~ Total_Crime_Per_Resident + p50_inc + Black_Share + White_Share + Hispanic_Share, data = Regession_Dataset, model = "pooling")
+Pure_Pooling_Total_Crime_Per_Resident
+# Coefficients:
+# (Intercept)       Total_Crime_Per_Resident           p50_inc 
+#  2.0519e+02              -1.2505e+03               9.1821e-04 
+# Black_Share              White_Share             Hispanic_Share 
+# -6.6849e+01              -8.5926e+01              -8.2112e+01
+
+# pooling regression with district-level controls
+Pure_Pooling_TotalCrime <- plm(tenure ~ Total_Crime + p50_inc + Black_Share + White_Share + Hispanic_Share, data = Final_Dataset, index = "district", model = "pooling")
+summary(Pure_Pooling_TotalCrime)
+# Coefficients:
+# Estimate  Std. Error t-value  Pr(>|t|)    
+# (Intercept)     1.7921e+02  7.2301e-01 247.873 < 2.2e-16 ***
+# Total_Crime    -1.5059e-02  1.7084e-04 -88.145 < 2.2e-16 ***
+# p50_inc         6.1594e-04  5.1274e-06 120.129 < 2.2e-16 ***
+# Black_Share    -5.2260e+01  7.3738e-01 -70.873 < 2.2e-16 ***
+# White_Share    -3.3424e+01  9.3942e-01 -35.579 < 2.2e-16 ***
+# Hispanic_Share -4.6262e+01  7.6066e-01 -60.819 < 2.2e-16 ***
+
+District_Pooling_Total_Crime_Per_Resident <- plm(tenure ~ Total_Crime_Per_Resident + p50_inc + Black_Share + White_Share + Hispanic_Share, data = Regession_Dataset, index = "district", model = "pooling")
+summary(District_Pooling_Total_Crime_Per_Resident)
+# Coefficients:
+#  Estimate  Std. Error t-value  Pr(>|t|)    
+# (Intercept)               2.0519e+02  1.4567e+00 140.861 < 2.2e-16 ***
+# Total_Crime_Per_Resident -1.2505e+03  1.4571e+01 -85.820 < 2.2e-16 ***
+# p50_inc                   9.1821e-04  1.0971e-05  83.696 < 2.2e-16 ***
+# Black_Share              -6.6849e+01  1.4562e+00 -45.907 < 2.2e-16 ***
+# White_Share              -8.5926e+01  1.9556e+00 -43.938 < 2.2e-16 ***
+# Hispanic_Share           -8.2112e+01  1.5277e+00 -53.747 < 2.2e-16 ***
+
+#===========================================================================
+# Another way to do it
+# First-step: merging with the officer dataset
+Raw_E3 = full_join(Officers2, Finished_Merge,
+                by = c('month'='month','unit'='district'))
+E3 = Raw_E3[,c(1:7,9:12)]
+E3 = E3[rowSums(is.na(E3[,1:11])) == 0,]
+
+# Second-step: Estimation
+X_E3 = as.matrix(E3[,c(6:7,9:11)])
+Y_E3 = as.matrix(E3[,4])
+
+Pooling_model_E3 = lm(Y_E3 ~ 0 + X_E3)
+coefficient_E3 = summary(Pooling_model_E3)$coefficient
+coefficient_E3
+
+#                             Estimate   Std. Error   t value      Pr(>|t|)
+# X_E3total_crime_district  -0.02674046 1.439750e-04 -185.7299        0
+# X_E3median_income          0.00110301 7.347743e-06  150.1155        0
+# X_E3share_of_black       149.78169822 2.839178e-01  527.5530        0
+# X_E3share_of_hispanic    163.89120152 3.461140e-01  473.5179        0
+# X_E3share_of_white       145.76611502 7.690988e-01  189.5285        0
+
+
+#// Exercise Four
+# Because of the unbalanced feature, I could not use the plm package to carry out fixed-effect estimation.
+# So, I have to create moth and district dummy variables firstly. 
+Regession_Dataset = Regession_Dataset[rowSums(is.na(Regession_Dataset[,1:13])) == 0,]
+E4 = dummy_cols(Regession_Dataset, select_columns = c('district','month'))
+
+# Estimation
+X_E4 = as.matrix(E4[,c(4:5,8:10,14:170)])
+Y_E4 = as.matrix(E4[,12])
+Fixed_Effect_E4 = lm(Y_E4 ~ 0 + X_E4)
+coefficient_E4 = summary(Fixed_Effect_E4)$coefficient
+coefficient_E4
+coefficient_E4[1:5]
+#                                 Estimate   Std. Error      t value      Pr(>|t|)
+# X_E4p50_inc                  -5.167599e-04 7.369220e-05  -7.01241038  2.343836e-12
+# X_E4Total_Crime_Per_Resident  1.508433e+03 4.448614e+01  33.90794116 6.916113e-252
+# X_E4Black_Share              -1.235269e+02 1.178955e+01 -10.47765648  1.097335e-25
+# X_E4White_Share               4.077335e+01 2.084548e+01   1.95598046  5.046771e-02
+# X_E4Hispanic_Share           -4.155925e+02 2.287347e+01 -18.16919465  9.284825e-74
+
+# Let us have a double check by using the dtatset obtanined from alternative way of merging.
+E4_DC = dummy_cols(E3, select_columns = c('unit','month')) 
+
+# Estimation
+X_E4_DC = as.matrix(E4_DC[,c(6:7,9:11,12:168)])
+Y_E4_DC = as.matrix(E4_DC[,4])
+Fixed_Effect_E4DC = lm(Y_E4_DC ~ 0 + X_E4_DC)
+coefficient_E4DC = summary(Fixed_Effect_E4DC)$coefficient
+coefficient_E4DC
+coefficient_E4DC[1:5]
+
+#                                Estimate   Std. Error      t value      Pr(>|t|)
+# X_E4_DCtotal_crime_district  1.726399e-02 4.238451e-04  40.73182865  0.000000e+00
+# X_E4_DCmedian_income         6.482377e-04 5.197471e-05  12.47217591  1.061961e-35
+# X_E4_DCshare_of_black       -8.716178e+01 8.330258e+00 -10.46327590  1.275547e-25
+# X_E4_DCshare_of_hispanic    -4.186582e+02 1.619981e+01 -25.84339857 3.040347e-147
+# X_E4_DCshare_of_white       -1.426986e+02 1.452181e+01  -9.82650170  8.666966e-23
+
+
+#// Exercise Five
+# Data creation
+
+# With mean differences
+E5_meandiff = E4_DC %>% group_by(NUID) %>%
+  mutate(across(!month & !unit, ~.x - mean(.x)))
+
+# With means
+E5_means = E4_DC %>% group_by(NUID) %>%
+  summarise(across(!month & !unit, list(mean)))
+
+# with first differences
+E5_firstdiff = E4_DC %>% group_by(NUID) %>%
+  mutate(across(!month & !district, ~.x-lag(.x)))
+E5_firstdiff = E5_firstdiff[rowSums(is.na(E5_firstdiff[,1:11]))== 0,]
+
+# A within estimator
+X_E5_meandiff = as.matrix(E5_meandiff[,c(6:7,9:11,12:36,38:99)])
+Y_E5_meandiff = as.matrix(E5_meandiff[,4])
+model_E5_meandiff = lm(Y_E5_meandiff ~ 0 + X_E5_meandiff)
+coefficeint_E5_meandiff = summary(model_E5_meandiff)$coefficient
+coefficeint_E5_meandiff
+
+#                                      Estimate   Std. Error    t value      Pr(>|t|)
+# X_E5_meandifftotal_crime_district -4.121670e-02 5.918930e-05 -696.35391  0.000000e+00
+# X_E5_meandiffmedian_income        -1.477408e-03 1.061685e-05 -139.15693  0.000000e+00
+# X_E5_meandiffshare_of_black       -7.235609e+01 1.615373e+00  -44.79220  0.000000e+00
+# X_E5_meandiffshare_of_hispanic    -3.003595e+02 3.093401e+00  -97.09686  0.000000e+00
+# X_E5_meandiffshare_of_white        8.868806e+01 2.812809e+00   31.53007 3.774371e-218
+
+# A Between Estimator
+X_E5_means = as.matrix(E5_means[,c(4:5,7:9,10:34,36:166)])
+Y_E5_means = as.matrix(E5_means[,2])
+model_E5_means = lm(Y_E5_means ~ 0 + X_E5_means)
+coefficeint_E5_means = summary(model_E5_means)$coefficient
+coefficeint_E5_means
+
+#                                     Estimate    Std. Error      t value    Pr(>|t|)
+# X_E5_meanstotal_crime_district_1 -4.287996e-03 8.439758e-03  -0.50807092 6.114123e-01
+# X_E5_meansmedian_income_1         6.642523e-04 1.037956e-03   0.63996187 5.222088e-01
+# X_E5_meansshare_of_black_1       -1.098566e+02 1.695283e+02  -0.64801347 5.169878e-01
+# X_E5_meansshare_of_hispanic_1    -3.381840e+02 3.274060e+02  -1.03291923 3.016611e-01
+# X_E5_meansshare_of_white_1       -1.687822e+02 2.985714e+02  -0.56529915 5.718802e-01
+
+# A First-Difference Estimator
+X_E5_firstdiff = as.matrix(E5_firstdiff[,c(6:7,9:11,12:36,38:99)])
+Y_E5_firstdiff = as.matrix(E5_firstdiff[,4])
+model_E5_firstdiff = lm(Y_E5_firstdiff ~ 0 + X_E5_firstdiff)
+coefficient_E5_firstdiff = summary(model_E5_firstdiff)$coefficient
+beta_E5_firstdiff = solve(t(X_E5_firstdiff) %*% X_E5_firstdiff) %*% t(X_E5_firstdiff) %*% Y_E5_firstdiff
+
+
+### GMM Estimation
+## Here I just take the reproduction of E3's result as one example
+
+GMM_Initial = 0
+for (i in nrow(X_E3)){
+  GMM = (Y_E3[i] - X_E3[i,]%*%coefficient_E3[,1])[1,1]*t(X_E3[i,])
+  prod = GMM %*% t(GMM)
+  GMM_InitialUP = GMM_Initial + prod
+}
+GMM = (Y_E3[1] - X_E3[1,]%*%coefficient_E3[,1])[1,1]*t(X_E3[1,])
+GMM
+#           total_crime_district median_income share_of_black share_of_hispanic share_of_white
+# [1,]            -218146.5      -9972097      -11.64609         -74.30712      -67.29415
