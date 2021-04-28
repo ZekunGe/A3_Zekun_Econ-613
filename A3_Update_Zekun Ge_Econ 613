@@ -362,6 +362,66 @@ coefficient_E5_firstdiff
 # X_E5_firstdiffshare_of_hispanic     1.810360e+02 4.826598e-01  375.0798315  0.000000e+00
 # X_E5_firstdiffshare_of_white        2.102690e+02 1.035240e+00  203.1113374  0.000000e+00
 
+#=================================================================================
+# Here inputs one double-check.
+
+# Data creation
+
+# With mean differences
+E5_meandiff_DC = E4 %>% group_by(NUID) %>%
+  mutate(across(!month & !district, ~.x - mean(.x)))
+
+# With means
+E5_means_DC = E4 %>% group_by(NUID) %>%
+  summarise(across(!month & !district, list(mean)))
+
+# with first differences
+E5_firstdiff_DC = E4 %>% group_by(NUID) %>%
+  mutate(across(!month & !district, ~.x-lag(.x)))
+E5_firstdiff_DC = E5_firstdiff_DC[rowSums(is.na(E5_firstdiff_DC[,1:11]))== 0,]
+
+# A within estimator
+X_E5_meandiff_DC = as.matrix(E5_meandiff_DC[,c(4:5,8:10,14:38,40:170)])
+Y_E5_meandiff_DC = as.matrix(E5_meandiff_DC[,12])
+model_E5_meandiff_DC = lm(Y_E5_meandiff_DC ~ 0 + X_E5_meandiff_DC)
+coefficeint_E5_meandiff_DC = summary(model_E5_meandiff_DC)$coefficient
+coefficeint_E5_meandiff_DC
+
+#                                             Estimate    Std. Error       t value  Pr(>|t|)
+# X_E5_meandiff_DCp50_inc                  -5.196425e-08 3.150039e-07    -0.1649639 0.8689725
+# X_E5_meandiff_DCTotal_Crime_Per_Resident -2.170781e-01 1.743968e-01    -1.2447369 0.2132288
+# X_E5_meandiff_DCBlack_Share               4.185821e-02 4.731660e-02     0.8846410 0.3763505
+# X_E5_meandiff_DCWhite_Share               4.405629e-02 8.330600e-02     0.5288490 0.5969103
+# X_E5_meandiff_DCHispanic_Share            7.962477e-02 9.055350e-02     0.8793119 0.3792324
+
+# A Between Estimator
+X_E5_means_DC = as.matrix(E5_means_DC[,c(3:4,7:9,12:36,38:168)])
+Y_E5_means_DC = as.matrix(E5_means_DC[,10])
+model_E5_means_DC = lm(Y_E5_means_DC ~ 0 + X_E5_means_DC)
+coefficeint_E5_means_DC = summary(model_E5_means_DC)$coefficient
+coefficeint_E5_means_DC
+
+#                                            Estimate    Std. Error      t value     Pr(>|t|)
+# X_E5_means_DCp50_inc_1                   1.364919e-03 1.020355e-03   1.337690605 1.810210e-01
+# X_E5_means_DCTotal_Crime_Per_Resident_1 -1.488764e+03 6.123068e+02  -2.431401825 1.505408e-02
+# X_E5_means_DCBlack_Share_1              -1.195977e+02 1.691840e+02  -0.706908707 4.796360e-01
+# X_E5_means_DCWhite_Share_1              -3.597887e+02 3.044372e+02  -1.181815729 2.373007e-01
+# X_E5_means_DCHispanic_Share_1           -4.717382e+02 3.286514e+02  -1.435375799 1.512043e-01
+
+# A First-Difference Estimator
+X_E5_firstdiff_DC = as.matrix(E5_firstdiff_DC[,c(4:5,8:10,14:38,40:170)])
+Y_E5_firstdiff_DC = as.matrix(E5_firstdiff_DC[,12])
+model_E5_firstdiff_DC = lm(Y_E5_firstdiff_DC ~ 0 + X_E5_firstdiff_DC)
+coefficient_E5_firstdiff_DC = summary(model_E5_firstdiff_DC)$coefficient
+coefficient_E5_firstdiff_DC
+
+#                                              Estimate   Std. Error       t value   Pr(>|t|)
+# X_E5_firstdiff_DCp50_inc                  -2.660362e-06 1.591536e-06   -1.67156920 0.09460960
+# X_E5_firstdiff_DCTotal_Crime_Per_Resident  5.531251e-02 3.555569e-01    0.15556584 0.87637528
+# X_E5_firstdiff_DCBlack_Share               5.554794e-01 3.036761e-01    1.82918386 0.06737235
+# X_E5_firstdiff_DCWhite_Share               1.154666e+00 5.308708e-01    2.17504111 0.02962726
+# X_E5_firstdiff_DCHispanic_Share            8.085528e-01 5.667370e-01    1.42668086 0.15367220
+
 
 ### GMM Estimation
 ## Here I just take the reproduction of E3's result as one example
